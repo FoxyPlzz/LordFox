@@ -19,7 +19,7 @@ export const botConfig = {
     // 1 = Streaming
     // 2 = Listening
     // 3 = Watching
-    // 4 = Custom
+    // 4 = busy
     // 5 = Competing
     activities: [
       {
