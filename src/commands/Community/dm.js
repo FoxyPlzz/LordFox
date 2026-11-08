@@ -58,6 +58,23 @@ export default {
             const recipients = members.filter(member =>
                 !member.user.bot && member.roles.cache.has(role.id)
             );
+
+            // TODO: Filter recipients using your explicit DM opt-in
+            // database preference before sending.
+
+            return await InteractionHelper.safeEditReply(interaction, {
+                content:
+                    `Role: **${role.name}**\n` +
+                    `Members found: **${recipients.size}**\n\n` +
+                    'The recipient opt-in system must be connected before delivery.'
+            });
+
+        } catch (error) {
+            logger.error('[DM] Command error:', error);
+
+            return await replyUserError(interaction, {
+                type: ErrorTypes.UNKNOWN,
+                message: 'An error occurred while processing the announcement.'
             });
         }
     }
