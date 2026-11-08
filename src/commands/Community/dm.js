@@ -1,13 +1,17 @@
 
 import {
     SlashCommandBuilder,
-    EmbedBuilder,
-    MessageFlags
+    EmbedBuilder
 } from 'discord.js';
 
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { logger } from '../../utils/logger.js';
-import { ErrorTypes, replyUserError } from '../../utils/errorHandler.js';
+import {
+    ErrorTypes,
+    replyUserError
+} from '../../utils/errorHandler.js';
+
+const OWNER_ID = '1152943439688761404';
 
 export default {
     data: new SlashCommandBuilder()
@@ -30,11 +34,8 @@ export default {
             const deferSuccess = await InteractionHelper.safeDefer(interaction);
             if (!deferSuccess) return;
 
-            const ownerIds = process.env.OWNER_IDS
-                ?.split(',')
-                .map(id => id.trim()) || [];
-
-            if (!ownerIds.includes(interaction.user.id)) {
+            // Owner permission check
+            if (interaction.user.id !== OWNER_ID) {
                 return await replyUserError(interaction, {
                     type: ErrorTypes.PERMISSION,
                     message: 'Only the bot owner can use this command.'
@@ -52,28 +53,32 @@ export default {
             }
 
             try {
+                const embed = new EmbedBuilder()
+                    .setColor(0x168BFF)
+                    .setDescription(message)
+                    .setFooter({
+                        text: `Message from ${interaction.guild?.name || 'TitanBot'}`
+                    })
+                    .setTimestamp();
+
                 await user.send({
-                    embeds: [
-                        new EmbedBuilder()
-                            .setColor(0x168BFF)
-                            .setDescription(message)
-                            .setFooter({ text: `Message from ${interaction.guild?.name || 'TitanBot'}` })
-                            .setTimestamp()
-                    ],
+                    embeds: [embed],
                     allowedMentions: { parse: [] }
                 });
 
-                logger.info(`[DM] Message sent to ${user.id} by ${interaction.user.id}`);
+                logger.info(
+                    `[DM] Message sent to ${user.id} by ${interaction.user.id}`
+                );
 
                 return await InteractionHelper.safeEditReply(interaction, {
-                    content: `✅ Successfully sent your DM to **${user.tag}**.`
+                    content: `✅ Successfully sent your DM to **${user.username}**.`
                 });
 
             } catch (error) {
                 logger.warn(`[DM] Failed to send DM to ${user.id}:`, error);
 
                 return await InteractionHelper.safeEditReply(interaction, {
-                    content: `❌ Couldn't DM **${user.tag}**. They may have DMs disabled or blocked the bot.`
+                    content: `❌ Couldn't DM **${user.username}**. Their privacy settings may prevent it.`
                 });
             }
 
