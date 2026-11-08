@@ -1,7 +1,8 @@
 
 import {
     SlashCommandBuilder,
-    EmbedBuilder
+    EmbedBuilder,
+    PermissionFlagsBits
 } from 'discord.js';
 
 import { InteractionHelper } from '../../utils/interactionHelper.js';
@@ -11,21 +12,20 @@ import {
     replyUserError
 } from '../../utils/errorHandler.js';
 
-const OWNER_ID = '1152943439688761404';
-
 export default {
     data: new SlashCommandBuilder()
         .setName('dm')
-        .setDescription('Send a private message to a server member')
-        .addUserOption(option =>
+        .setDescription('Send a private announcement to opted-in role members')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .addRoleOption(option =>
             option
-                .setName('user')
-                .setDescription('The member who will receive the DM')
+                .setName('role')
+                .setDescription('Choose the recipient role')
                 .setRequired(true))
         .addStringOption(option =>
             option
                 .setName('message')
-                .setDescription('The message to send')
+                .setDescription('Write your announcement')
                 .setMaxLength(2000)
                 .setRequired(true)),
 
@@ -34,15 +34,17 @@ export default {
             const deferSuccess = await InteractionHelper.safeDefer(interaction);
             if (!deferSuccess) return;
 
-            // Owner permission check
-            if (interaction.user.id !== OWNER_ID) {
+            // Check administrator permission
+            if (!interaction.memberPermissions?.has(
+                PermissionFlagsBits.Administrator
+            )) {
                 return await replyUserError(interaction, {
                     type: ErrorTypes.PERMISSION,
-                    message: 'Only the bot owner can use this command.'
+                    message: 'Only server administrators can use this command.'
                 });
             }
 
-            const user = interaction.options.getUser('user');
+            const role = interaction.options.getRole('role');
             const message = interaction.options.getString('message');
 
             if (!message?.trim()) {
@@ -52,42 +54,27 @@ export default {
                 });
             }
 
-            try {
-                const embed = new EmbedBuilder()
-                    .setColor(0x168BFF)
-                    .setDescription(message)
-                    .setFooter({
-                        text: `Message from ${interaction.guild?.name || 'TitanBot'}`
-                    })
-                    .setTimestamp();
+            const members = await interaction.guild.members.fetch();
+            const recipients = members.filter(member =>
+                !member.user.bot && member.roles.cache.has(role.id)
+            );
 
-                await user.send({
-                    embeds: [embed],
-                    allowedMentions: { parse: [] }
-                });
+            // TODO: Filter recipients using your explicit DM opt-in
+            // database preference before sending.
 
-                logger.info(
-                    `[DM] Message sent to ${user.id} by ${interaction.user.id}`
-                );
-
-                return await InteractionHelper.safeEditReply(interaction, {
-                    content: `✅ Successfully sent your DM to **${user.username}**.`
-                });
-
-            } catch (error) {
-                logger.warn(`[DM] Failed to send DM to ${user.id}:`, error);
-
-                return await InteractionHelper.safeEditReply(interaction, {
-                    content: `❌ Couldn't DM **${user.username}**. Their privacy settings may prevent it.`
-                });
-            }
+            return await InteractionHelper.safeEditReply(interaction, {
+                content:
+                    `Role: **${role.name}**\n` +
+                    `Members found: **${recipients.size}**\n\n` +
+                    'The recipient opt-in system must be connected before delivery.'
+            });
 
         } catch (error) {
             logger.error('[DM] Command error:', error);
 
             return await replyUserError(interaction, {
                 type: ErrorTypes.UNKNOWN,
-                message: 'An error occurred while sending the DM.'
+                message: 'An error occurred while processing the announcement.'
             });
         }
     }
